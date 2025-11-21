@@ -104,10 +104,6 @@ const App: React.FC = () => {
                           <h4 className="font-bold text-slate-800 mb-3">Scan Metadata</h4>
                           <div className="space-y-3 text-sm text-slate-600">
                               <div className="flex justify-between pb-2 border-b border-slate-200">
-                                  <span>Model Version</span>
-                                  <span className="font-medium">Gemini 2.5 Flash</span>
-                              </div>
-                              <div className="flex justify-between pb-2 border-b border-slate-200">
                                   <span>Processing Time</span>
                                   <span className="font-medium">~1.2s</span>
                               </div>
