@@ -15,31 +15,49 @@ const cleanJson = (text: string): string => {
 };
 
 export const analyzeHemoImage = async (base64Image: string, config: ScanConfig): Promise<AnalysisResult> => {
-  const model = 'gemini-2.5-flash-image';
+  // Use gemini-2.5-flash for superior multimodal reasoning and analysis capabilities
+  const model = 'gemini-2.5-flash';
   
-  // Prompt engineering to simulate the medical expert system
+  // Advanced Prompt Engineering with Chain-of-Thought for Medical Analysis
   const prompt = `
-    Act as an expert hematologist and AI medical diagnostic system. 
-    Analyze this image of a ${config.area === 'NailBed' ? 'fingernail bed' : config.area === 'Conjunctiva' ? 'eye conjunctiva' : 'palm'}.
+    Role: Act as a board-certified Hematologist and expert Computer Vision Medical Diagnostic System.
+    Task: Screen the provided image for signs of Anemia (Iron Deficiency) by rigorously analyzing the ${config.area === 'NailBed' ? 'Fingernails (Nail Beds)' : config.area === 'Conjunctiva' ? 'Eye (Lower Palpebral Conjunctiva)' : 'Palm of Hand'}.
     
-    Focus on the following visual biomarkers for anemia detection:
-    1. Pallor (paleness) of the tissue.
-    2. Redness/Hemoglobin color intensity.
-    3. Texture and vascularization visibility.
-    
-    Based on these visual cues, predict if the subject is likely 'Anemic' or 'Normal'.
-    
-    IMPORTANT: Return ONLY a valid JSON object with no additional text.
-    Structure:
+    Step 1: Image Quality & Validity Check
+    - Is the image in focus and well-lit?
+    - Is the target area (${config.area}) clearly visible?
+    - If the image is too dark, blurry, black & white, or does not contain the correct body part, YOU MUST return "prediction": "Uncertain" and explain why.
+
+    Step 2: Biomarker Analysis (Chain of Thought)
+    ${config.area === 'NailBed' ? `
+    - Analyze Nail Bed Color: Healthy nail beds are distinctively pink due to hemoglobin. Anemic nail beds appear pale, white, or bluish.
+    - Check for Koilonychia: Look for spoon-shaped indentations (if visible).
+    - Assess Lunula Contrast: If the distinction between the white lunula and the rest of the nail is lost due to overall pallor, this indicates anemia.
+    ` : config.area === 'Conjunctiva' ? `
+    - Analyze the Palpebral Conjunctiva: Focus on the inner lining of the pulled-down lower eyelid.
+    - Color Assessment: A healthy conjunctiva is bright pink or red with visible capillaries.
+    - Anemia Signs: Look for a pale, porcelain-white, or very faint pink color. 
+    ` : `
+    - Analyze Palmar Creases: Look at the major lines on the palm.
+    - Healthy: Creases are darker/redder than the surrounding skin.
+    - Anemic: Creases are as pale as the skin ("washed out"), indicating severe anemia.
+    - General Perfusion: Compare overall skin tone to expected healthy vascularization.
+    `}
+
+    Step 3: Diagnosis Formulation
+    - Combine observations to determine a Pallor Level (None, Mild, Moderate, Severe).
+    - Assign a Prediction: "Normal" (Healthy perfusion) vs "Anemic" (Significant pallor) vs "Uncertain".
+    - Assign Confidence (0-100%) based on the clarity of the visual evidence.
+
+    Step 4: Output Generation
+    Return ONLY a valid JSON object with this structure:
     {
       "prediction": "Anemic" | "Normal" | "Uncertain",
-      "confidence": number (0-100),
+      "confidence": number,
       "pallorLevel": "None" | "Mild" | "Moderate" | "Severe",
-      "reasoning": "A short, clear explanation suitable for a community health worker.",
-      "recommendations": ["string", "string", "string"] (3 dietary or lifestyle tips relevant to the result)
+      "reasoning": "Concise, professional medical explanation referencing specific visual cues found (e.g. 'The nail beds exhibit healthy capillary refill color...').",
+      "recommendations": ["Dietary tip 1", "Lifestyle tip 2", "Next step (e.g. See a doctor)"]
     }
-    
-    If the image is blurry, dark, or not a body part, set prediction to "Uncertain" and explain why in reasoning.
   `;
 
   try {
@@ -57,14 +75,27 @@ export const analyzeHemoImage = async (base64Image: string, config: ScanConfig):
             text: prompt
           }
         ]
+      },
+      config: {
+        temperature: 0.1, // Low temperature for more deterministic, analytical results
       }
     });
 
     const responseText = response.text || "{}";
     const cleanedText = cleanJson(responseText);
-    const result = JSON.parse(cleanedText) as AnalysisResult;
     
-    return result;
+    try {
+      const result = JSON.parse(cleanedText) as AnalysisResult;
+      
+      // Safety fallbacks
+      if (!result.prediction) result.prediction = 'Uncertain';
+      if (!result.reasoning) result.reasoning = 'Analysis completed, but no detailed reasoning was returned.';
+      
+      return result;
+    } catch (parseError) {
+      console.error("JSON Parse failed on:", cleanedText);
+      throw new Error("Invalid JSON format from model");
+    }
 
   } catch (error) {
     console.error("Gemini Analysis Failed:", error);
@@ -72,8 +103,8 @@ export const analyzeHemoImage = async (base64Image: string, config: ScanConfig):
       prediction: 'Uncertain',
       confidence: 0,
       pallorLevel: 'None',
-      reasoning: "AI analysis failed due to network or image issues. Please try again.",
-      recommendations: ["Ensure good lighting", "Hold camera steady"]
+      reasoning: "The AI could not process the image with high confidence. This may be due to poor lighting, blurriness, or network issues.",
+      recommendations: ["Ensure the image is well-lit (natural light is best)", "Hold the camera steady to avoid blur", "Focus specifically on the nail bed or inner eyelid"]
     };
   }
 };
