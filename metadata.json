@@ -1,0 +1,7 @@
+{
+  "name": "AI - Anemia Detector",
+  "description": "Non-invasive anemia detection and health awareness application using AI image analysis.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
